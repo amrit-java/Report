@@ -1,0 +1,26 @@
+@Repository
+public interface ApplicantBiometricsRepository extends JpaRepository<ApplicantBiometricsEntity, String> {
+
+	@Query("select scanned_image FROM ApplicantBiometricsEntity WHERE file_number=:filenumber ")
+	byte[] findImagebyId(@Param("filenumber") String filenumber);
+
+}
+----------------------------------------
+@Service
+@Transactional
+public class ApplicantBiometricsServiceImpl implements ApplicantBiometricsService {
+	
+	@Autowired
+	ApplicantBiometricsRepository applicantBiometricsRepository;
+
+	@Override
+	public byte[] getapplicantImages(String filenumber) throws Exception {
+		return applicantBiometricsRepository.findImagebyId(filenumber);
+	}
+}
+-----------------------------------------
+@Service
+public interface ApplicantBiometricsService {
+	byte[] getapplicantImages(String filenumber) throws Exception;
+	
+}
