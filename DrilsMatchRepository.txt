@@ -1,0 +1,1080 @@
+package com.ttp.repository.report;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+
+import com.ttp.entities.master.DrilsMatchEntity;
+
+@Repository
+public interface DrilsMatchRepository extends JpaRepository<DrilsMatchEntity, String>{
+	
+}
+---------------------------------------
+package com.ttp.serviceImpl;
+
+import java.sql.Blob;
+import java.util.ArrayList;
+import java.util.Base64;
+import java.util.List;
+
+import javax.persistence.EntityManager;
+import javax.persistence.PersistenceContext;
+import javax.persistence.Query;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.stereotype.Service;
+
+import com.ttp.entities.master.ApplicantDetails;
+import com.ttp.entities.master.DrilsMatchEntity;
+import com.ttp.repository.report.DrilsMatchRepository;
+import com.ttp.service.report.DrilsMatchService;
+@Service
+public class DrilsMatchServiceImpl implements DrilsMatchService {
+	
+	@Autowired
+	JdbcTemplate JdbcTemplate;
+     
+	@PersistenceContext
+	EntityManager entityManager;
+	
+	@Autowired
+	DrilsMatchRepository drilsMatchRepository;
+
+	@Override
+	public List<DrilsMatchEntity> getByDrilsMatch(String startDate, String endDate) {
+		 List<DrilsMatchEntity> list = new ArrayList<>();
+		    Query q = entityManager.createNativeQuery(
+		            "SELECT  NVL(tt.FILE_NUMBER, 0) AS FILE_NUMBER, NVL(tt.PASSPORT_NUMBER, 'Unknown') AS PASSPORT_NUMBER,NVL(tt.DRILS_STATUS, 'Unknown') AS DRILS_STATUS,\r\n"
+		            + "       TO_CHAR(NVL (tt.DRILS_UPDATED_DATE, NULL), 'DD/MM/YYYY') AS DRILS_UPDATED_DATE,TO_CHAR(NVL(tt.CREATED_DATE, NULL), 'DD/MM/YYYY') AS CREATED_DATE,NVL(tt.CREATED_TIME, 'Unknown') AS CREATED_TIME,\r\n"
+		            + "        NVL(em.EMPLOYEE_NAME, 'Unknown') || ' (' || NVL(tt.CREATED_BY, 'Unknown') || ')' AS CREATED_BY FROM APPLICANT_DRILS_MATCH_DETAILS tt\r\n"
+		            + " JOIN EMPLOYEE_MASTER em ON em.EMPLOYEE_ID = NVL(tt.CREATED_BY, 0)\r\n"
+		            + "WHERE NVL(tt.CREATED_DATE, NULL) BETWEEN TO_DATE(?1, 'YYYY-MM-DD') AND TO_DATE(?2, 'YYYY-MM-DD')");
+
+		    q.setParameter(1, startDate);
+		    q.setParameter(2, endDate);
+
+		    List<Object[]> objarr = q.getResultList();
+
+		    for (Object[] obj : objarr) {
+		        int i = 0;
+		        DrilsMatchEntity drilsMatchEntity = new DrilsMatchEntity();
+		        drilsMatchEntity.setFile_number(String.valueOf(obj[i++]));
+		        drilsMatchEntity.setPassport_number(String.valueOf(obj[i++]));
+		        drilsMatchEntity.setDrils_status(String.valueOf(obj[i++]));
+		        drilsMatchEntity.setDrils_updated_date(String.valueOf(obj[i++]));
+		        drilsMatchEntity.setCreated_date(String.valueOf(obj[i++]));
+		        drilsMatchEntity.setCreated_time(String.valueOf(obj[i++]));
+		        drilsMatchEntity.setCreated_by(String.valueOf(obj[i++]));
+		        
+		        list.add(drilsMatchEntity);
+		    }
+
+		    return list;
+	}
+	
+	@Override
+	public List<ApplicantDetails> getByApplicantDrilsMatchAndpassportNO(String passport_NO) {
+		 List<ApplicantDetails> list = new ArrayList<>();
+		    try {
+		        Query q = entityManager.createNativeQuery(
+		            "SELECT amd.FILE_NUMBER, amd.APPL_FIRSTNAME || ' ' || COALESCE(amd.APPL_MIDNAME, '') || ' ' || amd.APPL_SURNAME AS full_name, \r\n"
+		            + "        (SELECT GENDER_DESCRIPTION FROM GENDER_MASTER WHERE GENDER_CODE = amd.GENDER) AS Gender, \r\n"
+		            + "        (SELECT COUNTRY_NAME FROM COUNTRY_MASTER WHERE COUNTRY_CODE = amd.NATIONALITY) AS NATIONALITY,\r\n"
+		            + "        TO_CHAR(amd.DATEOFBIRTH, 'DD/MM/YYYY') AS DATEOFBIRTH, amd.PASSPORT_NUMBER,amd.OTHER_PASSPORT_NO,\r\n"
+		            + "        TO_CHAR(amd.PASSPORT_ISSUE_DATE, 'DD/MM/YYYY') AS PASSPORT_ISSUE_DATE, \r\n"
+		            + "        TO_CHAR(amd.PASSPORT_EXPIRY_DATE, 'DD/MM/YYYY') AS PASSPORT_EXPIRY_DATE, \r\n"
+		            + "        (SELECT EMPLOYEE_NAME FROM EMPLOYEE_MASTER WHERE EMPLOYEE_ID = amd.VISA_GRANTED_BY) || ' (' || amd.VISA_GRANTED_BY || ')' AS VISA_GRANTED_BY, \r\n"
+		            + "        TO_CHAR(amd.VISA_GRANTED_DATE, 'DD/MM/YYYY') AS VISA_GRANTED_DATE, \r\n"
+		            + "        amd.VISA_GRANTED_REMARK FROM TTP_APPLICANT_DETAILS amd \r\n"
+		            + "         INNER JOIN (SELECT DISTINCT PASSPORT_NUMBER FROM APPLICANT_DRILS_MATCH_DETAILS) ab \r\n"
+		            + "         ON amd.PASSPORT_NUMBER = ab.PASSPORT_NUMBER WHERE amd.PASSPORT_NUMBER = ?1"
+		        );
+		        q.setParameter(1, passport_NO);
+
+		        List<Object[]> objarr = q.getResultList();
+
+		        for (Object[] obj : objarr) {
+		            int i = 0;
+		            ApplicantDetails applicantDetails = new ApplicantDetails();
+		            applicantDetails.setFILE_NUMBER(String.valueOf(obj[i++]));
+		            applicantDetails.setFull_name(String.valueOf(obj[i++]));
+		            applicantDetails.setGENDER(String.valueOf(obj[i++]));
+		            applicantDetails.setNATIONALITY(String.valueOf(obj[i++]));
+		            applicantDetails.setDATEOFBIRTH(String.valueOf(obj[i++]));
+		            applicantDetails.setPASSPORT_NO(String.valueOf(obj[i++]));
+		            applicantDetails.setOTHER_PASSPORT_NO(String.valueOf(obj[i++]));
+		            applicantDetails.setPASSPORT_ISSUE_DATE(String.valueOf(obj[i++]));
+		            applicantDetails.setPASSPORT_EXPIRY_DATE(String.valueOf(obj[i++]));
+		            applicantDetails.setVISA_GRANTED_BY(String.valueOf(obj[i++]));
+		            applicantDetails.setVISA_GRANTED_DATE(String.valueOf(obj[i++]));
+		            applicantDetails.setVISA_CENTRAL_BL_STATUS_REMARK(String.valueOf(obj[i++]));
+		            
+		            list.add(applicantDetails);
+		        }
+		    } catch (Exception e) {
+		        e.printStackTrace();
+		    }
+
+		    return list;
+	}
+
+	@Override
+	public List<ApplicantDetails> getByApplicantDrilsMatchAndStatus() {
+		 List<ApplicantDetails> list = new ArrayList<>();
+		    Query q = entityManager.createNativeQuery(
+		            "SELECT tt.FILE_NUMBER,  tt.APPL_FIRSTNAME || ' ' || COALESCE(tt.APPL_MIDNAME, '') || ' ' || tt.APPL_SURNAME AS full_name, \r\n"
+		            + "       (SELECT GENDER_DESCRIPTION  FROM GENDER_MASTER  WHERE GENDER_CODE = tt.GENDER) AS Gender, \r\n"
+		            + "       (SELECT COUNTRY_NAME FROM COUNTRY_MASTER  WHERE COUNTRY_CODE = tt.NATIONALITY) AS NATIONALITY, \r\n"
+		            + "       TO_CHAR(tt.DATEOFBIRTH, 'DD/MM/YYYY') AS DATEOFBIRTH, tt.PASSPORT_NUMBER, tt.OTHER_PASSPORT_NO, \r\n"
+		            + "       TO_CHAR(tt.PASSPORT_ISSUE_DATE, 'DD/MM/YYYY') AS PASSPORT_ISSUE_DATE, \r\n"
+		            + "       TO_CHAR(tt.PASSPORT_EXPIRY_DATE, 'DD/MM/YYYY') AS PASSPORT_EXPIRY_DATE, \r\n"
+		            + "       (SELECT EMPLOYEE_NAME  FROM EMPLOYEE_MASTER  WHERE EMPLOYEE_ID = tt.VISA_GRANTED_BY) || ' (' || tt.VISA_GRANTED_BY || ')' AS VISA_GRANTED_BY, \r\n"
+		            + "       TO_CHAR(tt.VISA_GRANTED_DATE, 'DD/MM/YYYY') AS VISA_GRANTED_DATE, tt.VISA_GRANTED_REMARK FROM TTP_APPLICANT_DETAILS tt\r\n"
+		            + "     INNER JOIN APPLICANT_DRILS_MATCH_DETAILS adm\r\n"
+		            + "    ON tt.FILE_NUMBER = adm.FILE_NUMBER");
+            
+		    List<Object[]> objarr = q.getResultList();
+
+		    for (Object[] obj : objarr) {
+		        int i = 0;
+		        ApplicantDetails applicantDetails = new ApplicantDetails();
+		        applicantDetails.setFILE_NUMBER(String.valueOf(obj[i++]));
+		        applicantDetails.setFull_name(String.valueOf(obj[i++]));
+		        applicantDetails.setGENDER(String.valueOf(obj[i++]));
+		        applicantDetails.setNATIONALITY(String.valueOf(obj[i++]));
+		        applicantDetails.setDATEOFBIRTH(String.valueOf(obj[i++]));
+		        applicantDetails.setPASSPORT_NO(String.valueOf(obj[i++]));
+		        applicantDetails.setOTHER_PASSPORT_NO(String.valueOf(obj[i++]));  
+		        applicantDetails.setPASSPORT_EXPIRY_DATE(String.valueOf(obj[i++]));
+		        applicantDetails.setPASSPORT_ISSUE_DATE(String.valueOf(obj[i++]));
+		        applicantDetails.setVISA_GRANTED_BY(String.valueOf(obj[i++]));
+		        applicantDetails.setVISA_GRANTED_DATE(String.valueOf(obj[i++]));
+		        applicantDetails.setVISA_CENTRAL_BL_STATUS_REMARK(String.valueOf(obj[i++]));
+		        list.add(applicantDetails);
+		    }
+
+		    return list;
+	}
+
+	@Override
+	public List<ApplicantDetails> getByApplicantDrilsMatchAndStatus(String file_number) {
+	    List<ApplicantDetails> list = new ArrayList<>();
+	    try {
+	        Query q = entityManager.createNativeQuery(
+	            "SELECT amd.FILE_NUMBER, " +
+	            "       amd.APPL_FIRSTNAME || ' ' || COALESCE(amd.APPL_MIDNAME, '') || ' ' || amd.APPL_SURNAME AS full_name, " +
+	            "       (SELECT GENDER_DESCRIPTION FROM GENDER_MASTER WHERE GENDER_CODE = amd.GENDER) AS Gender, " +
+	            "       (SELECT COUNTRY_NAME FROM COUNTRY_MASTER WHERE COUNTRY_CODE = amd.NATIONALITY) AS NATIONALITY, " +
+	            "       TO_CHAR(amd.DATEOFBIRTH, 'DD/MM/YYYY') AS DATEOFBIRTH, " +
+	            "       amd.PASSPORT_NUMBER, " +
+	            "       amd.OTHER_PASSPORT_NO, " +
+	            "       TO_CHAR(amd.PASSPORT_ISSUE_DATE, 'DD/MM/YYYY') AS PASSPORT_ISSUE_DATE, " +
+	            "       TO_CHAR(amd.PASSPORT_EXPIRY_DATE, 'DD/MM/YYYY') AS PASSPORT_EXPIRY_DATE, " +
+	            "       (SELECT EMPLOYEE_NAME FROM EMPLOYEE_MASTER WHERE EMPLOYEE_ID = amd.VISA_GRANTED_BY) || ' (' || amd.VISA_GRANTED_BY || ')' AS VISA_GRANTED_BY, " +
+	            "       TO_CHAR(amd.VISA_GRANTED_DATE, 'DD/MM/YYYY') AS VISA_GRANTED_DATE, " +
+	            "       amd.VISA_GRANTED_REMARK, " +
+	            "       ab.scanned_image " +
+	            "FROM TTP_APPLICANT_DETAILS amd " +
+	            "LEFT JOIN APPLICANT_BIOMETRICS ab ON amd.FILE_NUMBER = ab.FILE_NUMBER " +  
+	            "WHERE amd.FILE_NUMBER = ?1"
+	        );
+	        q.setParameter(1, file_number);
+
+	        List<Object[]> objarr = q.getResultList();
+
+	        for (Object[] obj : objarr) {
+	            int i = 0;
+	            ApplicantDetails applicantDetails = new ApplicantDetails();
+	            applicantDetails.setFILE_NUMBER(String.valueOf(obj[i++]));
+	            applicantDetails.setFull_name(String.valueOf(obj[i++]));
+	            applicantDetails.setGENDER(String.valueOf(obj[i++]));
+	            applicantDetails.setNATIONALITY(String.valueOf(obj[i++]));
+	            applicantDetails.setDATEOFBIRTH(String.valueOf(obj[i++]));
+	            applicantDetails.setPASSPORT_NO(String.valueOf(obj[i++]));
+	            applicantDetails.setOTHER_PASSPORT_NO(String.valueOf(obj[i++]));
+	            applicantDetails.setPASSPORT_ISSUE_DATE(String.valueOf(obj[i++]));
+	            applicantDetails.setPASSPORT_EXPIRY_DATE(String.valueOf(obj[i++]));
+	            applicantDetails.setVISA_GRANTED_BY(String.valueOf(obj[i++]));
+	            applicantDetails.setVISA_GRANTED_DATE(String.valueOf(obj[i++]));
+	            applicantDetails.setVISA_CENTRAL_BL_STATUS_REMARK(String.valueOf(obj[i++]));
+	            Blob scanned_image_blob = (Blob) obj[i++];
+	            if (scanned_image_blob != null) {
+	                byte[] scanned_image_bytes = scanned_image_blob.getBytes(1, (int) scanned_image_blob.length());
+	                String base64ScannedImage = Base64.getEncoder().encodeToString(scanned_image_bytes);
+	                applicantDetails.setScanned_image(base64ScannedImage);
+	            } else {
+	                applicantDetails.setScanned_image(null); 
+	            }
+
+	            list.add(applicantDetails);
+	        }
+	    } catch (Exception e) {
+	        e.printStackTrace();
+	    }
+
+	    return list;
+	}
+}
+---------------------------------------------------
+package com.ttp.controller.report;
+
+import java.util.List;
+
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.servlet.ModelAndView;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
+
+import com.ttp.entities.master.ApplicantDetails;
+import com.ttp.entities.master.DrilsMatchEntity;
+import com.ttp.service.report.DrilsMatchService;
+
+@Controller
+@RequestMapping("/users")
+public class ApplicantDrilsMatchReportController {
+	
+	@Autowired
+	DrilsMatchService drilsMatchService;
+	
+	@GetMapping("/drilsmatchreport")
+	public String drilsmatchreport(Model model, HttpServletRequest request) {
+
+		return "appldrilsmatchreport";
+	}
+	
+	@PostMapping("/drilsmatchreport")
+	public ModelAndView getWhitelistreport(HttpServletResponse servletResponse,RedirectAttributes redirectAttributes, HttpServletRequest request,
+	        @RequestParam("startDate") String startDate,
+	        @RequestParam("endDate") String endDate,
+	        @RequestParam(value = "status", required = false) String status) {
+	    ModelAndView modelAndView = new ModelAndView();
+	    List<DrilsMatchEntity> drilsMatchEntity = drilsMatchService.getByDrilsMatch(startDate, endDate);
+	    
+	    redirectAttributes.addFlashAttribute("drilsMatchEntity", drilsMatchEntity);
+        redirectAttributes.addFlashAttribute("startDate", startDate);
+        redirectAttributes.addFlashAttribute("endDate", endDate);
+        
+	    modelAndView.setViewName("redirect:/users/drilsmatchreport");
+	    return modelAndView;
+	}
+	
+	@PostMapping("/drilsmatchreportStatus")
+	public ResponseEntity<?> fetchDataByFilter(HttpServletResponse servletResponse, HttpServletRequest request,
+	        @RequestParam(value = "status", required = false) String status,
+	        @RequestParam(value = "passport_number", required = false) String passportNumber,
+	        @RequestParam(value = "file_number", required = false) String fileNumber) {
+	    try {
+	        List<ApplicantDetails> applicantDetails1 = null;
+
+	        if (status != null && status.equalsIgnoreCase("T")) {
+	            applicantDetails1 = drilsMatchService.getByApplicantDrilsMatchAndStatus();
+	        } else if (passportNumber != null) {
+	        	applicantDetails1 = drilsMatchService.getByApplicantDrilsMatchAndpassportNO(passportNumber);
+	        } else if (fileNumber != null) {
+	            applicantDetails1 = drilsMatchService.getByApplicantDrilsMatchAndStatus(fileNumber);
+	        }
+
+	        return ResponseEntity.ok().body(applicantDetails1);
+	    } catch (Exception e) {
+	        e.printStackTrace();
+	        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Something went wrong");
+	    }
+	}
+}
+-----------------------------------------------------
+package com.ttp.serviceImpl;
+
+import java.io.ByteArrayOutputStream;
+import java.io.FileNotFoundException;
+import java.io.InputStream;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+
+import javax.persistence.EntityManager;
+import javax.persistence.PersistenceContext;
+import javax.persistence.Query;
+import javax.servlet.http.HttpServletResponse;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.io.ClassPathResource;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.stereotype.Service;
+
+import com.ttp.entities.master.ApplicantDetails;
+import com.ttp.repository.report.ApplicantDetailsRepositroy;
+import com.ttp.service.report.WhiteListReportService;
+
+import net.sf.jasperreports.engine.JasperCompileManager;
+import net.sf.jasperreports.engine.JasperFillManager;
+import net.sf.jasperreports.engine.JasperPrint;
+import net.sf.jasperreports.engine.JasperReport;
+import net.sf.jasperreports.engine.export.JRPdfExporter;
+import net.sf.jasperreports.engine.export.ooxml.JRXlsxExporter;
+import net.sf.jasperreports.export.SimpleExporterInput;
+import net.sf.jasperreports.export.SimpleOutputStreamExporterOutput;
+import net.sf.jasperreports.export.SimpleXlsxReportConfiguration;
+
+
+@Service
+public class WhiteListReportServiceImpl implements WhiteListReportService {
+	
+	@Autowired
+	JdbcTemplate JdbcTemplate;
+     
+	@PersistenceContext
+	EntityManager entityManager;
+	
+	@Autowired
+	ApplicantDetailsRepositroy applicantDetailsRepositroy;
+	
+	
+	@Override
+	public List<ApplicantDetails> getByApplicantDetails(String startDate, String endDate) {
+	    List<ApplicantDetails> list = new ArrayList<>();
+	    Query q = entityManager.createNativeQuery(
+	            "SELECT NVL(tt.FILE_NUMBER, ' ') AS FILE_NUMBER, NVL(TO_CHAR(tt.REG_DATE, 'DD/MM/YYYY'), ' ') AS REG_DATE, NVL(tt.APPL_FIRSTNAME || ' ' || COALESCE(tt.APPL_MIDNAME, '') || ' ' || tt.APPL_SURNAME, ' ') AS full_name, \r\n"
+	            + "    NVL(tt.PASSPORT_NUMBER, ' ') AS PASSPORT_NUMBER, NVL((SELECT COALESCE(CATEGORY_DESCREPTION, ' ') FROM APPLICANT_CATEGORY_MASTER WHERE CATEGORY_CODE = tt.APPLCATEGORY), ' ') AS APPLCATEGORY, \r\n"
+	            + "    NVL(TO_CHAR(tt.VISA_GRANTED_DATE, 'DD/MM/YYYY'), ' ') AS VISA_GRANTED_DATE, NVL(tt.APPL_EMAIL, ' ') AS APPL_EMAIL, NVL(tt.APPL_MOBILE, ' ') AS APPL_MOBILE, \r\n"
+	            + "    NVL(DECODE(tt.LOC_UPDATED_STATUS, 'A', 'ACTIVATED', 'D', 'DE-ACTIVATED', tt.LOC_UPDATED_STATUS), ' ') AS LOC_UPDATED_STATUS \r\n"
+	            + "   FROM TTP_APPLICANT_DETAILS tt WHERE tt.LOC_UPDATED_DATE BETWEEN TO_DATE(?1, 'YYYY-MM-DD') AND TO_DATE(?2, 'YYYY-MM-DD')");
+
+	    q.setParameter(1, startDate);
+	    q.setParameter(2, endDate);
+
+	    List<Object[]> objarr = q.getResultList();
+
+	    for (Object[] obj : objarr) {
+	        int i = 0;
+	        ApplicantDetails applicantDetails = new ApplicantDetails();
+	        applicantDetails.setFILE_NUMBER(String.valueOf(obj[i++]));
+	        applicantDetails.setREG_DATE(String.valueOf(obj[i++]));
+	        applicantDetails.setFull_name(String.valueOf(obj[i++]));
+	        applicantDetails.setPASSPORT_NO(String.valueOf(obj[i++]));
+	        applicantDetails.setAPPLCATEGORY(String.valueOf(obj[i++]));
+	        applicantDetails.setVISA_GRANTED_DATE(String.valueOf(obj[i++]));
+	        applicantDetails.setAPPL_EMAIL(String.valueOf(obj[i++]));
+	        applicantDetails.setAPPL_MOBILE(String.valueOf(obj[i++]));
+	        applicantDetails.setLOC_UPDATED_STATUS(String.valueOf(obj[i++]));
+	        list.add(applicantDetails);
+	    }
+
+	    return list;
+	}
+	
+	@Override
+	public List<ApplicantDetails> getByApplicantDetailsAndStatus(String startDate, String endDate, String status) {
+	    List<ApplicantDetails> list = new ArrayList<>();
+	    Query q = entityManager.createNativeQuery(
+	        "SELECT NVL(tt.FILE_NUMBER, ' ') AS FILE_NUMBER, \r\n"
+	        + "       NVL(TO_CHAR(tt.REG_DATE, 'DD/MM/YYYY'), ' ') AS REG_DATE,\r\n"
+	        + "       NVL(tt.APPL_FIRSTNAME || ' ' || COALESCE(tt.APPL_MIDNAME, '') || ' ' || tt.APPL_SURNAME, ' ') AS full_name, \r\n"
+	        + "       NVL(tt.PASSPORT_NUMBER, ' ') AS PASSPORT_NUMBER, \r\n"
+	        + "       NVL((SELECT COALESCE(CATEGORY_DESCREPTION, ' ') \r\n"
+	        + "            FROM APPLICANT_CATEGORY_MASTER \r\n"
+	        + "            WHERE CATEGORY_CODE = tt.APPLCATEGORY), ' ') AS APPLCATEGORY, \r\n"
+	        + "       NVL(TO_CHAR(tt.VISA_GRANTED_DATE, 'DD/MM/YYYY'), ' ') AS VISA_GRANTED_DATE,\r\n"
+	        + "       NVL(tt.APPL_EMAIL, ' ') AS APPL_EMAIL, \r\n"
+	        + "       NVL(tt.APPL_MOBILE, ' ') AS APPL_MOBILE, \r\n"
+	        + "       NVL(DECODE(tt.LOC_UPDATED_STATUS, 'A', 'ACTIVATED', 'D', 'DE-ACTIVATED', tt.LOC_UPDATED_STATUS), ' ') AS LOC_UPDATED_STATUS \r\n"
+	        + "  FROM TTP_APPLICANT_DETAILS tt \r\n"
+	        + " WHERE tt.LOC_UPDATED_DATE BETWEEN TO_DATE(?1, 'YYYY-MM-DD') AND TO_DATE(?2, 'YYYY-MM-DD') \r\n"
+	        + "   AND (tt.LOC_UPDATED_STATUS = ?3 OR tt.LOC_UPDATED_STATUS IS NULL)"); 
+
+	    q.setParameter(1, startDate);
+	    q.setParameter(2, endDate);
+	    q.setParameter(3, status); 
+
+	    List<Object[]> objarr = q.getResultList();
+
+	    for (Object[] obj : objarr) {
+	        int i = 0;
+	        ApplicantDetails applicantDetails = new ApplicantDetails();
+	        applicantDetails.setFILE_NUMBER(String.valueOf(obj[i++]));
+	        applicantDetails.setREG_DATE(String.valueOf(obj[i++]));
+	        applicantDetails.setFull_name(String.valueOf(obj[i++]));
+	        applicantDetails.setPASSPORT_NO(String.valueOf(obj[i++]));
+	        applicantDetails.setAPPLCATEGORY(String.valueOf(obj[i++]));
+	        applicantDetails.setVISA_GRANTED_DATE(String.valueOf(obj[i++]));
+	        applicantDetails.setAPPL_EMAIL(String.valueOf(obj[i++]));
+	        applicantDetails.setAPPL_MOBILE(String.valueOf(obj[i++]));
+	        applicantDetails.setLOC_UPDATED_STATUS(String.valueOf(obj[i++]));
+	        list.add(applicantDetails);
+	    }
+
+	    return list;
+	}
+
+	
+	public byte[] exportWhiteListReportExcel(String reportFormat, HttpServletResponse servletResponse,
+			Map<String, Object> parameters) {
+		String path = "reports/ApplicantWhiteListReport.jrxml";
+
+		try {
+			ClassPathResource resource = new ClassPathResource(path);
+			try (InputStream inputStream = resource.getInputStream()) {
+				JasperReport jasperReport = JasperCompileManager.compileReport(inputStream);
+
+				JasperPrint jasperPrint = JasperFillManager.fillReport(jasperReport, parameters,
+						JdbcTemplate.getDataSource().getConnection());
+
+				JRXlsxExporter exporter = new JRXlsxExporter();
+				exporter.setExporterInput(new SimpleExporterInput(jasperPrint));
+
+				ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+				exporter.setExporterOutput(new SimpleOutputStreamExporterOutput(byteArrayOutputStream));
+
+				final SimpleXlsxReportConfiguration configuration = new SimpleXlsxReportConfiguration();
+				exporter.setConfiguration(configuration);
+				configuration.setOnePagePerSheet(true);
+				configuration.setDetectCellType(true);
+				configuration.setCollapseRowSpan(false);
+				configuration.setCellLocked(true);
+				configuration.setIgnorePageMargins(true);
+				configuration.setCollapseRowSpan(true);
+				exporter.exportReport();
+
+				return byteArrayOutputStream.toByteArray();
+			} catch (FileNotFoundException e) {
+				e.printStackTrace();
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+
+		return null;
+	}
+
+	public byte[] exportWhiteListReport(String reportFormat, HttpServletResponse servletResponse,
+			Map<String, Object> parameters) {
+		String path = "reports/ApplicantWhiteListReport.jrxml";
+
+		try {
+			ClassPathResource resource = new ClassPathResource(path);
+			try (InputStream inputStream = resource.getInputStream()) {
+				JasperReport jasperReport = JasperCompileManager.compileReport(inputStream);
+
+				JasperPrint jasperPrint = JasperFillManager.fillReport(jasperReport, parameters,
+						JdbcTemplate.getDataSource().getConnection());
+
+				JRPdfExporter exporter = new JRPdfExporter();
+				exporter.setExporterInput(new SimpleExporterInput(jasperPrint));
+
+				ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+				exporter.setExporterOutput(new SimpleOutputStreamExporterOutput(byteArrayOutputStream));
+
+				servletResponse.setHeader("Content-Disposition", "attachment; filename=ApplicantWhiteListReport.pdf");
+				exporter.exportReport();
+
+				return byteArrayOutputStream.toByteArray();
+			} catch (FileNotFoundException e) {
+				e.printStackTrace();
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+
+		return null;
+	}
+}
+------------------------------------------------------
+package com.ttp.controller.report;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.ModelAttribute;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.servlet.ModelAndView;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
+
+import com.ttp.dao.PdfDawnload;
+import com.ttp.entities.master.ApplicantDetails;
+import com.ttp.service.report.WhiteListReportService;
+
+@Controller
+@RequestMapping("/report")
+public class ApplicantWhiteListReportController {
+	
+	@Autowired
+	WhiteListReportService whiteListReportService;
+	
+	@Autowired
+	com.ttp.serviceImpl.WhiteListReportServiceImpl WhiteListReportServiceImpl;
+	
+	@GetMapping("/whitelistreport")
+	public String applicantDetails1(Model model, HttpServletRequest request) {
+
+		return "applicantWhiteList";
+	}
+	
+	@PostMapping("/whitelistreport")
+	public ModelAndView getWhitelistreport(HttpServletResponse servletResponse,RedirectAttributes redirectAttributes, HttpServletRequest request,
+	        @RequestParam("startDate") String startDate,
+	        @RequestParam("endDate") String endDate,
+	        @RequestParam(value = "status", required = false) String status) {
+	    ModelAndView modelAndView = new ModelAndView();
+	    List<ApplicantDetails> applicantDetails = whiteListReportService.getByApplicantDetails(startDate, endDate);
+	    
+	    redirectAttributes.addFlashAttribute("applicantDetails", applicantDetails);
+        redirectAttributes.addFlashAttribute("startDate", startDate);
+        redirectAttributes.addFlashAttribute("endDate", endDate);
+        
+	    modelAndView.setViewName("redirect:/report/whitelistreport");
+	    return modelAndView;
+	}
+	
+	@PostMapping("/whitelistreportStatus")
+	public ResponseEntity<?> fetchDataByFilerfno(HttpServletResponse servletResponse, HttpServletRequest request,
+	        @RequestParam("startDate") String startDate,
+	        @RequestParam("endDate") String endDate,
+	        @RequestParam(value = "status", required = false) String status) {
+	    List<ApplicantDetails> applicantDetails1 = whiteListReportService.getByApplicantDetailsAndStatus(startDate, endDate, status);
+	    try {
+	        return ResponseEntity.ok().body(applicantDetails1);
+	    } catch (Exception e) {
+	        e.printStackTrace();
+	        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Something went wrong");
+	    }
+	}
+
+	
+	 @PostMapping("/Whitelistreport")
+	 public void exportReport(HttpServletResponse servletResponse, HttpServletRequest request,
+	         @ModelAttribute("ApplicantDetails") PdfDawnload applicantDetails) {
+
+	     try {
+	         Map<String, Object> parameters = new HashMap<>();
+	         parameters.put("createdBy", "ApplicantDetails");
+	         parameters.put("startDate", applicantDetails.getStartDate());
+	         parameters.put("endDate", applicantDetails.getEndDate());
+
+	         if (applicantDetails.getStatus().equalsIgnoreCase("xlsx")) {
+	             byte[] reportBytes = WhiteListReportServiceImpl.exportWhiteListReportExcel(applicantDetails.getStatus(), servletResponse, parameters);
+	             if (reportBytes != null) {
+	                 servletResponse.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+	                 servletResponse.setHeader("Content-Disposition", "attachment; filename=ApplicantWhiteListReport.xlsx");
+	                 servletResponse.setContentLength(reportBytes.length);
+	                 servletResponse.getOutputStream().write(reportBytes);
+	             }
+	         } else {
+	        	 byte[] reportBytes = WhiteListReportServiceImpl.exportWhiteListReport(applicantDetails.getStatus(), servletResponse, parameters);
+	             if (reportBytes != null) {
+	                 servletResponse.setContentType("application/pdf");
+	                 servletResponse.setHeader("Content-Disposition", "attachment; filename=ApplicantWhiteListReport.pdf");
+	                 
+	                 servletResponse.getOutputStream().write(reportBytes);
+	             }
+	         }
+	     } catch (Exception e) {
+	         e.printStackTrace();
+	     }
+	 }
+
+}
+------------------
+<%@ taglib uri="http://www.springframework.org/tags/form" prefix="form"%>
+<%@ taglib prefix="spring" uri="http://www.springframework.org/tags"%>
+<%@ taglib uri="http://java.sun.com/jsp/jstl/core" prefix="c"%>
+
+<html lang="true">
+<head>
+<meta charset=UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="_csrf" content="${_csrf.token}" />
+<meta name="_csrf_header" content="${_csrf.headerName}" />
+<link rel="stylesheet" href="<c:url value='/resources/vendor/datatables/datatable_css_2/buttons.dataTables.min.css' />"> 
+ <script src="<c:url value='/resources/vendor/jquery/jquery-3.3.1.min.js' />"></script>
+ <script src="<c:url value='/resources/vendor/datatables/datatable_js_2/buttons.html5.min.js' />"></script>
+  <script src="<c:url value='/resources/vendor/datatables/datatable_js_2/dataTables.buttons.min_1.js' />"></script>
+  <script src="<c:url value='/resources/vendor/datatables/datatable_js_2/dataTables.buttons.min.js' />"></script>
+  <script src="<c:url value='/resources/vendor/datatables/datatable_js_2/jszip.min.js' />"></script>
+  <script src="<c:url value='/resources/vendor/datatables/datatable_js_2/pdfmake.min.js' />"></script>
+  <script src="<c:url value='/resources/vendor/datatables/datatable_js_2/vfs_fonts.js' />"></script>
+ 
+ 
+    <style type="text/css">
+        .info, .success, .warning, .error, .validation {
+            border: 1px solid;
+            margin: 10px 0;
+            padding: 15px 10px 10px 40px;
+            background-repeat: no-repeat;
+            background-position: 10px center;
+        }
+        .info {
+            color: #00529B;
+            background-color: #BDE5F8;
+        }
+        .error {
+            color: red;
+        }
+        
+         .modal-custom-size {
+            width: 95%;
+            max-width: 135em;
+            height: auto;
+        }
+
+        .nowrap {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        #modalTitle {
+    text-align: center;
+    margin: 0 auto;
+    width: fit-content;
+}
+        
+    </style>
+</head>
+<body>
+    <h4 style="text-align: center;">TTP APPLICANT DETAILS REPORT</h4>
+    <div class="container table-responsive">
+        <div class="container-fluid px-4">
+            <div class="card">
+                <div class="card-body">
+                    <form:form modelAttribute="ApplicantDetails" id="applicantDetails"
+                        action="${pageContext.request.contextPath}/report/TTPApplicantDetails"
+                        method="post">
+                        <div class="row align-items-end">
+                            <div class="col-md-3">
+                                <label>From Date <font color="red">*</font></label>
+                                <input type="date" id="processDate" name="startDate"
+                                    class="form-control" required value="<c:out value='${startDate}'/>">
+                            </div>
+                            <div class="col-md-3">
+                                <label>To Date <font color="red">*</font></label>
+                                <input type="date" id="processDate1" name="endDate"
+                                    class="form-control" required value="<c:out value='${endDate}'/>">
+                            </div>
+                            <div class="col-md-3">
+                                <label>&nbsp;</label>
+                                <div class="input-group input-group-sm">
+                                    <input type="submit" class="btn btn-primary btn-sm"
+                                        style="width: 50%; height: 40px;" id="submitform" value="Go">
+                                </div>
+                            </div>
+                        </div>
+                        <input type="hidden" class="form-control form-control-sm"
+                            name="registrationdate" id="registrationdate"
+                            placeholder="Registration Date (DD/MM/YYYY)" autocomplete="off">
+                    </form:form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <br>
+   
+   
+   
+   <c:choose>
+    <c:when test="${not empty counts}">
+        <div class="form-control form-control-sm table table-bordered table-sm"
+        style="background-color: #e9ecef;" id="tabledivid">
+        <div class="row">
+            <div class="col-sm-12">
+            <table><tr>
+            <td width="42%">
+            
+            <table
+                    class="table table-sm table-hover table-striped table-bordered display compact"
+                    id="proDataTable" width="100%" cellspacing="0">
+                    <thead class="thead-light">
+                        <tr class="table-dark">
+                            <th>Total Record</th>
+                            <th>Rejected</th>
+                            <th>Granted</th>
+                            <th>Image</th>
+                            <th>Document</th>
+                           <th>Both(Image&amp;Document)</th>
+                            <th>OnHold</th> 
+                            <th>Pending</th>                        
+                            
+                        </tr>
+                  </thead>
+                    <tbody>
+                        <tr>
+                            <td><a class="modal-link" data-toggle="modal"
+                                data-target="#exampleModal" data-visaGrantFlag="T" title="T">${counts.total_records}</a></td>
+                            <td><a class="modal-link" data-toggle="modal"
+                                data-target="#exampleModal" data-visaGrantFlag="R" title="R">${counts.rejected_count}</a></td>
+                            <td><a class="modal-link" data-toggle="modal"
+                                data-target="#exampleModal" data-visaGrantFlag="G" title="G">${counts.granted_count}</a></td>
+                            <td><a class="modal-link" data-toggle="modal"
+                                data-target="#exampleModal" data-visaGrantFlag="I" title="I">${counts.image}</a></td>
+                            <td><a class="modal-link" data-toggle="modal"
+                                data-target="#exampleModal" data-visaGrantFlag="D" title="D">${counts.document}</a></td>
+                            <td><a class="modal-link" data-toggle="modal"
+                                data-target="#exampleModal" data-visaGrantFlag="B" title="B">${counts.both}</a></td>
+                            <td><a class="modal-link" data-toggle="modal"
+                                data-target="#exampleModal" data-visaGrantFlag="O" title="O">${counts.onhold}</a></td>
+                                <td><a class="modal-link" data-toggle="modal"
+                                data-target="#exampleModal" data-visaGrantFlag="P" title="P">${counts.pending}</a></td>
+                                                           
+                        </tr>
+                    </tbody>
+                </table>
+          
+            </td>
+            
+            
+            <td width="20%">
+            
+              <table
+                   class="table table-sm table-hover table-striped table-bordered display compact"
+                    id="proDataTable" width="100%" cellspacing="0">
+                    <thead class="thead-light">
+                        <tr class="table-dark">
+                            <th>BL Rejected</th>
+                            <th>BL Suspect</th>
+                            <th>BL Cleared</th>
+                        </tr>
+                  </thead>
+                    <tbody>
+                        <tr>
+                            
+                            <td><a class="modal-link" data-toggle="modal"
+                                data-target="#exampleModal" data-visaOverallBlStatus="Pre_R" title="Pre_R">${counts.pre_rejected}</a></td>
+                            <td><a class="modal-link" data-toggle="modal"
+                                data-target="#exampleModal" data-visaOverallBlStatus="Pre_S" title="Pre_S">${counts.pre_SUSPACT}</a></td>
+                             <td><a class="modal-link" data-toggle="modal"
+                                data-target="#exampleModal" data-visaOverallBlStatus="Pre_C" title="Pre_C">${counts.pre_CLEAR}</a></td>
+                        </tr>
+                    </tbody>
+                </table>
+            
+            </td>
+            
+             <td width="20%">
+            
+              <table
+                    class="table table-sm table-hover table-striped table-bordered display compact"
+                    id="proDataTable" width="100%" cellspacing="0">
+                    <thead class="thead-light">
+                        <tr class="table-dark">
+                            <th>Post BL Rejected</th>
+                            <th>Post BL Cleared</th>
+                        </tr>
+                  </thead>
+                    <tbody>
+                        <tr>
+                            
+                            <td><a class="modal-link" data-toggle="modal"
+                                data-target="#exampleModal" data-postOverallBlStatus="Post_R" title="Post_R">${counts.post_rejected}</a></td>
+                            <td><a class="modal-link" data-toggle="modal"
+                                data-target="#exampleModal" data-postOverallBlStatus="Post_C" title="Post_C">${counts.post_clear}</a></td>
+                        </tr>
+                    </tbody>
+                </table>
+            
+            </td>
+            <td width="20%">
+            
+              <table
+                    class="table table-sm table-hover table-striped table-bordered display compact"
+                    id="proDataTable" width="100%" cellspacing="0">
+                    <thead class="thead-light">
+                        <tr class="table-dark">
+                            <th>PendingFRRO<=7</th>
+                            <th>PendingFRRO>7<=21</th>
+                        </tr>
+                  </thead>
+                    <tbody>
+                        <tr>
+                            
+                            <td><a class="modal-link" data-toggle="modal"
+                                data-target="#exampleModal" data-PendingFRRO="FRRO<=7" title="FRRO<=7">${counts1.current_date_lessthan_seven}</a></td>
+                            <td><a class="modal-link" data-toggle="modal"
+                                data-target="#exampleModal" data-PendingFRRO="FRRO>7<=21" title="FRRO>7<=21">${counts1.current_date_than_twentyone}</a></td>
+                        </tr>
+                    </tbody>
+                </table>
+            
+            </td>
+       
+            
+            </tr></table>
+                
+            </div>
+        </div>
+    </div>
+    </c:when>
+   
+</c:choose>
+
+
+
+ <div class="modal fade" id="exampleModal" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel" aria-hidden="true" style="width: 100%;">
+    <div class="modal-dialog modal-custom-size" role="document">
+        <div class="modal-content custom-border">
+            <div class="modal-header" style="background-color: #f0f0f0; padding: 20px;">
+                <h5 class="modal-title text-center" id="modalTitle">TTP APPLICANT DETAILS</h5>
+            </div>
+            <div class="modal-body">
+                <div class="mt-3">
+                    <div style="max-height: 400px; overflow-y: auto;">
+                        <table id="dataTable" class="table table-bordered" style="width: 100%; border: 2px solid black;">
+                            <thead class="thead-light">
+                                <tr class="table-dark">
+                                    <th class="custom-border">SR NO</th>
+                                    <th class="custom-border">FILE NO</th>
+                                    <th class="custom-border">NAME</th>
+                                    <th class="custom-border">GENDER</th>
+                                    <th class="custom-border">NATIONALITY</th>
+                                    <th class="custom-border">DATE OF BIRTH</th>
+                                    <th class="custom-border">PASSPORT NO</th>
+                                    <th class="custom-border">OTHER PASSPORT NO</th>
+                                    <th class="custom-border">PASSPORT ISSUE DATE</th>
+                                    <th class="custom-border">PASSPORT EXPIRY DATE</th>
+                                    <th class="custom-border">GRANTED BY</th>
+                                    <th class="custom-border">GRANTED DATE</th>
+                                    <th class="custom-border">REMARK</th>
+                                    <th class="custom-border">STATUS</th>
+                                    <th class="custom-border">VISA BL STATUS</th>
+                                    <th class="custom-border">VISA BL STATUS BY</th>
+                                    <th class="custom-border">VISA BL STATUS DATE</th>
+                                    <th class="custom-border">VISA BL STATUS TIME</th>
+                                    <th class="custom-border">POST BL STATUS</th>
+                                    <th class="custom-border">POST BL STATUS BY</th>
+                                    <th class="custom-border">POST BL STATUS DATE</th>
+                                    <th class="custom-border">POST BL STATUS TIME</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+           <div class="modal-footer">
+                <button type="button" class="btn btn-success" id="exportexcelButton">Export as Excel</button><br><br>
+                <span style="margin-right: 10px;"></span>
+                 <button type="button" class="btn btn-success" id="exportPdfButton">Export as PDF</button><br><br>
+                 <span style="margin-right: 10px;"></span>
+                <button type="button" class="btn btn-primary" data-dismiss="modal">CLOSE</button>
+                
+            </div>
+        </div>
+    </div>
+</div>
+
+    
+  <script type="text/javascript">
+    $(document).ready(function() {
+        $('#exportexcelButton').on('click', function() {
+            exportReport('xlsx');
+        });
+
+        $('#exportPdfButton').on('click', function() {
+            exportReport('pdf');
+        });
+
+        function exportReport(format) {
+            var startDate = $('#processDate').val();
+            var endDate = $('#processDate1').val();
+            var csrfToken = $("meta[name='_csrf']").attr("content");
+            var csrfHeader = $("meta[name='_csrf_header']").attr("content");
+
+            $.ajax({
+                type: "POST",
+                url: "${pageContext.request.contextPath}/report/TTPApplicantDetailsRepo",
+                data: {
+                    startDate: startDate,
+                    endDate: endDate,
+                    status: format
+                },
+                beforeSend: function(xhr) {
+                    xhr.setRequestHeader(csrfHeader, csrfToken);
+                },
+                xhrFields: {
+                    responseType: 'blob'
+                },
+                success: function(response) {
+                    var contentType;
+                    var fileExtension;
+                    if (format === 'pdf') {
+                        contentType = 'application/pdf';
+                        fileExtension = 'pdf';
+                    } else if (format === 'xlsx') {
+                        contentType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+                        fileExtension = 'xlsx';
+                    }
+                    var blob = new Blob([response], { type: contentType });
+                    var url = URL.createObjectURL(blob);
+                    var link = document.createElement('a');
+                    link.href = url;
+                    link.download = 'TTPAPPLICANTDETAILSREPORT.' + fileExtension;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                },
+                error: function(xhr, status, error) {
+                    console.error("Error occurred:", error);
+                    alert("An error occurred while exporting the report.");
+                }
+            });
+        }
+    });
+</script>
+
+    <script type="text/javascript">
+        $(document).ready(function() {
+            var dataTable = $('#dataTable').DataTable({
+                pageLength: 20,
+                paging: true,
+                searching: true,
+                lengthChange: false,
+                ordering: true,
+                dom: 'Bfrtip',
+                buttons: ['copy', 'csv', 'pdf'],
+                columns: [
+                    {
+                        data: null,
+                        render: function(data, type, row, meta) {
+                            return meta.row + 1;
+                        },
+                        width: "5%"
+                    },
+                    { data: 'filerfno' },
+                    { 
+                        data: 'full_name',
+                        render: function(data, type, row, meta) {
+                            return data;
+                        },
+                        className: 'nowrap'
+                    },
+                    { data: 'gender' },
+                    { data: 'nationality' },
+                    { data: 'dateOfBirth' },
+                    { data: 'passportNumber' },
+                    { data: 'otherPassportNo' },
+                    { data: 'passportIssueDate' },
+                    { data: 'passportExpiryDate' },
+                    { data: 'visaGrantedBy' },
+                    { data: 'visaGrantedDate' },
+                    {
+                        data: null,
+                        render: function(data, type, row, meta) {
+                            if (data.visaGrantedRemark != null) {
+                                var str = data.visaGrantedRemark;
+                                if (str.length > 30) {
+                                    return '<span style="cursor: pointer" title="' + str + '">' +
+                                        str.substring(0, 30) + '...</span>';
+                                } else {
+                                    return '<span style="cursor: pointer" title="' + str + '">' +
+                                        str + '...</span>';
+                                }
+                            } else {
+                                return '';
+                            }
+                        }
+                    },
+                    { data: 'visaGrantFlag' },
+                    { data: 'visaOverallBlStatus' },
+                    { data: 'visaOverallBlStatusBy' },
+                    { data: 'visaOverallBlStatusDate' },
+                    { data: 'visaOverallBlStatusTime' },
+                    { data: 'postOverallBlStatus' },
+                    { data: 'postOverallBlStatusBy' },
+                    { data: 'postOverallBlStatusDate' },
+                    { data: 'postOverallBlStatusTime' }
+                ]
+            });
+
+            function handleDetailClick(event) {
+            	
+                event.preventDefault();
+                var startDate = $('#processDate').val();
+                var endDate = $('#processDate1').val();
+                var csrfToken = $("meta[name='_csrf']").attr("content");
+                var csrfHeader = $("meta[name='_csrf_header']").attr("content");
+                var visaGrantFlag = $(this).attr("data-visaGrantFlag") || 'default';
+                var visaOverallBlStatus = $(this).attr("data-visaOverallBlStatus") || 'default';
+                var postOverallBlStatus = $(this).attr("data-postOverallBlStatus") || 'default';
+                var PendingFRRO = $(this).attr("data-PendingFRRO") || 'default';
+                $.ajax({
+                    type: "POST",
+                    url: "${pageContext.request.contextPath}/report/dataTable1",
+                    data: {
+                        startDate: startDate,
+                        endDate: endDate,
+                        visaGrantFlag: visaGrantFlag,
+                        visaOverallBlStatus: visaOverallBlStatus,
+                        postOverallBlStatus: postOverallBlStatus,
+                        PendingFRRO:PendingFRRO
+                    },
+                    beforeSend: function(xhr) {
+                        xhr.setRequestHeader(csrfHeader, csrfToken);
+                    },
+                    success: function(response) {
+                        dataTable.clear().rows.add(response).draw();
+                    },
+                    error: function(xhr, status, error) {
+                        console.error("Error occurred:", error);
+                    }
+                });
+            }
+
+            $('.modal-link').on('click', handleDetailClick);
+
+            function setModalTitle(visaGrantFlag) {
+                var title = '';
+                switch (visaGrantFlag) {
+                    case 'T': title = 'Applicant Details '; break;
+                    case 'R': title = 'Rejected Details'; break;
+                    case 'G': title = 'Granted Details'; break;
+                    case 'I': title = 'Image Details'; break;
+                    case 'D': title = 'Document Details'; break;
+                    case 'B': title = 'Both Details'; break;
+                    case 'O': title = 'On Hold Details'; break;
+                    case 'P': title = 'Pending Details'; break;
+                    case 'Pre_R': title = 'Pre BL Rejected Details'; break;
+                    case 'Pre_S': title = 'Pre BL Suspact Details'; break;
+                    case 'Pre_C': title = 'Pre BL Cleared Details'; break;
+                    case 'Post_R': title = 'Post BL Rejected Details'; break;
+                    case 'Post_C': title = 'Post BL Cleared Details'; break;
+                    case 'FRRO<=7': title = 'FRRO less than or equal to seven'; break;
+                    case 'FRRO>7<=21': title = 'FRRO greater than seven and less than or equal to twenty-one'; break;
+                    default: title = '';
+                }
+                $('#modalTitle').text(title);
+            }
+
+            $('.modal-link').on('click', function() {
+                var visaGrantFlag = $(this).attr('title');
+                setModalTitle(visaGrantFlag);
+            });
+            $('#exampleModal').on('hidden.bs.modal', function() {
+                $('#modalTitle').text('');
+            });
+        });
+    </script>
+
+</body>
+</html>
